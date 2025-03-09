@@ -43,7 +43,10 @@ jobs:
           remove-haskell: 'true'
           remove-codeql: 'true'
           remove-docker-images: 'true'
-
+- name: Manual OpenXR-SDK Clone
+  run: |
+    mkdir -p app/src/main/cpp
+    git clone https://github.com/KhronosGroup/OpenXR-SDK.git app/src/main/cpp/OpenXR-SDK
     - name: Checkout repo
       uses: actions/checkout@v4
       with:
