@@ -6,16 +6,21 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.Settings;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -39,6 +44,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     public static final byte OPEN_FILE_REQUEST_CODE = 2;
     public static final byte EDIT_INPUT_CONTROLS_REQUEST_CODE = 3;
     public static final byte OPEN_DIRECTORY_REQUEST_CODE = 4;
+    private static final int REQUEST_MANAGE_EXTERNAL_STORAGE = 100; // Код запроса для MANAGE_EXTERNAL_STORAGE
     private DrawerLayout drawerLayout;
     public final PreloaderDialog preloaderDialog = new PreloaderDialog(this);
     private boolean editInputControls = false;
@@ -65,15 +71,49 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_back);
             onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_input_controls));
             navigationView.setCheckedItem(R.id.main_menu_input_controls);
-        }
-        else {
+        } else {
             int selectedMenuItemId = intent.getIntExtra("selected_menu_item_id", 0);
             int menuItemId = selectedMenuItemId > 0 ? selectedMenuItemId : R.id.main_menu_containers;
 
             actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_menu);
             onNavigationItemSelected(navigationView.getMenu().findItem(menuItemId));
             navigationView.setCheckedItem(menuItemId);
-            if (!requestAppPermissions()) ImageFsInstaller.installIfNeeded(this);
+
+            // Проверка и запрос разрешений
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                requestManageExternalStoragePermission();
+            } else {
+                if (!requestAppPermissions()) ImageFsInstaller.installIfNeeded(this);
+            }
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    private void requestManageExternalStoragePermission() {
+        if (!Environment.isExternalStorageManager()) {
+            // Открываем настройки для предоставления разрешения
+            Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+            startActivityForResult(intent, REQUEST_MANAGE_EXTERNAL_STORAGE);
+        } else {
+            // Разрешение уже предоставлено
+            Toast.makeText(this, "Доступ к управлению всеми файлами предоставлен", Toast.LENGTH_SHORT).show();
+            ImageFsInstaller.installIfNeeded(this);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_MANAGE_EXTERNAL_STORAGE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (Environment.isExternalStorageManager()) {
+                    Toast.makeText(this, "Доступ к управлению всеми файлами предоставлен", Toast.LENGTH_SHORT).show();
+                    ImageFsInstaller.installIfNeeded(this);
+                } else {
+                    Toast.makeText(this, "Доступ к управлению всеми файлами не предоставлен", Toast.LENGTH_SHORT).show();
+                    finish(); // Закрыть приложение, если доступ не предоставлен
+                }
+            }
         }
     }
 
@@ -82,21 +122,25 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Разрешение предоставлено
                 ImageFsInstaller.installIfNeeded(this);
+            } else {
+                // Разрешение не предоставлено
+                Toast.makeText(this, "Доступ к хранилищу не предоставлен", Toast.LENGTH_SHORT).show();
+                finish(); // Закрыть приложение, если доступ не предоставлен
             }
-            else finish();
         }
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == MainActivity.OPEN_FILE_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
-            if (openFileCallback != null) {
-                openFileCallback.call(data.getData());
-                openFileCallback = null;
-            }
+    private boolean requestAppPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            return false;
         }
+
+        String[] permissions = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
+        ActivityCompat.requestPermissions(this, permissions, PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE);
+        return true;
     }
 
     @Override
@@ -117,26 +161,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         this.openFileCallback = openFileCallback;
     }
 
-    private boolean requestAppPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) return false;
-
-        String[] permissions = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
-        ActivityCompat.requestPermissions(this, permissions, PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE);
-        return true;
-    }
-
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem) {
         if (menuItem.getItemId() == R.id.containers_menu_add) {
             return super.onOptionsItemSelected(menuItem);
-        }
-        else {
+        } else {
             if (editInputControls) {
                 setResult(RESULT_OK);
                 finish();
+            } else {
+                drawerLayout.openDrawer(GravityCompat.START);
             }
-            else drawerLayout.openDrawer(GravityCompat.START);
             return true;
         }
     }
@@ -205,8 +240,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             TextView tvCreditsAndThirdPartyApps = dialog.findViewById(R.id.TVCreditsAndThirdPartyApps);
             tvCreditsAndThirdPartyApps.setText(Html.fromHtml(creditsAndThirdPartyAppsHTML, Html.FROM_HTML_MODE_LEGACY));
             tvCreditsAndThirdPartyApps.setMovementMethod(LinkMovementMethod.getInstance());
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
         }
-        catch (PackageManager.NameNotFoundException e) {}
 
         dialog.show();
     }
