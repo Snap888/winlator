@@ -3,7 +3,7 @@ name: Android Build
 on:
   push:
     branches: [main, master]
-  workflow_dispatch: # Ручной запуск
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,10 +14,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Важно для нативных модулей
+          submodules: recursive
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4 # Обновлено до v4
         with:
           java-version: 17
           distribution: temurin
@@ -29,7 +29,7 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4 # Исправлено на v4
         with:
           name: winlator-release
           path: app/build/outputs/apk/release/*.apk
