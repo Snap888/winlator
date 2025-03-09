@@ -1,3 +1,7 @@
+[submodule "src/main/cpp/OpenXR-SDK"]
+ 	path = src/main/cpp/OpenXR-SDK
+ 	url = https://github.com/KhronosGroup/OpenXR-SDK.git
+
 git submodule add https://github.com/KhronosGroup/OpenXR-SDK.git app/src/main/cpp/OpenXR-SDK
 git commit -am "Add OpenXR-SDK submodule"
 git push
