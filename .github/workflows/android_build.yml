@@ -26,7 +26,9 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-
+git submodule add https://github.com/KhronosGroup/OpenXR-SDK.git app/src/main/cpp/OpenXR-SDK
+git commit -am "Add OpenXR-SDK submodule"
+git push
 jobs:
   build:
     runs-on: ubuntu-latest
